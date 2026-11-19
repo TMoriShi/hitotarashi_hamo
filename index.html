@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ひとたらし ハモリ練習プレイヤー</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea, select {
+      user-select: text;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    .touch-press:active {
+      transform: scale(0.97);
+      transition: transform 0.08s ease;
+    }
+    .active-tile {
+      background: #0284c7 !important;
+      border-color: #38bdf8 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+    }
+    .active-tile .tile-sub {
+      color: #e0f2fe !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen md:h-screen md:overflow-hidden flex flex-col selection:bg-cyan-500 selection:text-slate-950 pb-24 md:pb-0">
+
+  <!-- ヘッダー -->
+  <header class="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-40 px-3 md:px-6 py-1.5 md:py-2.5 pt-safe flex items-center justify-between gap-2 shrink-0 shadow-sm">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <span class="text-sm sm:text-base md:text-xl font-black text-white tracking-tight truncate">ひとたらし</span>
+      <span class="text-[10px] sm:text-xs px-2 py-0.5 rounded bg-cyan-900/70 border border-cyan-500/40 text-cyan-300 font-bold shrink-0">ハモリ練習用</span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- モード切り替え -->
+      <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs md:text-sm">
+        <button id="btnModePlay" class="touch-press px-3 sm:px-4 py-1.5 rounded-lg font-bold transition bg-cyan-600 text-white shadow-sm">練習</button>
+        <button id="btnModeEdit" class="touch-press px-3 sm:px-4 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-slate-200">編集</button>
+      </div>
+
+      <div class="h-5 w-px bg-slate-800 mx-0.5 hidden sm:block"></div>
+
+      <!-- JSON インポート/エクスポート -->
+      <label class="cursor-pointer text-xs md:text-sm px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shrink-0" title="JSONインポート">
+        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <span class="font-medium hidden lg:inline">JSON読込</span>
+        <input type="file" id="jsonFileInput" accept=".json" class="hidden">
+      </label>
+
+      <button id="downloadJsonBtn" class="text-xs md:text-sm px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shrink-0" title="JSONエクスポート">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <span class="font-medium hidden lg:inline">JSON保存</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 w-full p-2 sm:p-3 md:p-5 flex flex-col md:flex-row gap-3 md:gap-4 md:overflow-hidden">
+
+    <!-- 左カラム: ミキサー + カラオケ音程バー + 動画 + タイムライン -->
+    <div class="w-full md:w-7/12 lg:w-3/5 flex flex-col gap-2 sm:gap-2.5 shrink-0 md:overflow-y-auto pr-0 md:pr-1">
+
+      <!-- ミキサーカード (ハモリWAV + 原曲WAV) -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-2 flex flex-col gap-1.5 shrink-0">
+        <div class="flex items-center justify-between gap-2 px-1">
+          <span class="text-[11px] sm:text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            ミキサー (動画は消音 / WAV同期)
+          </span>
+          <button id="btnToggleOffsetPanel" class="touch-press text-[11px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold transition">
+            Offset調整 ▸
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-1.5 sm:gap-2">
+          <!-- ハモリ音量 -->
+          <div class="flex items-center gap-1.5 sm:gap-2 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+            <button id="btnMuteHarmony" class="touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-cyan-950/70 text-cyan-300 border border-cyan-700/50 shrink-0" title="ハモリ ミュート切替">ハモリ</button>
+            <input id="harmonyVolumeSlider" type="range" min="0" max="100" value="100" class="flex-1 min-w-0 accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg">
+            <span id="harmonyVolumeVal" class="font-mono-num text-[11px] font-bold text-cyan-300 w-8 sm:w-9 text-right shrink-0">100%</span>
+          </div>
+          <!-- 原曲音量 -->
+          <div class="flex items-center gap-1.5 sm:gap-2 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
+            <button id="btnMuteOriginal" class="touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-700/50 shrink-0" title="原曲 ミュート切替">原曲</button>
+            <input id="originalVolumeSlider" type="range" min="0" max="100" value="85" class="flex-1 min-w-0 accent-emerald-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg">
+            <span id="originalVolumeVal" class="font-mono-num text-[11px] font-bold text-emerald-300 w-8 sm:w-9 text-right shrink-0">85%</span>
+          </div>
+        </div>
+
+        <!-- Offset編集パネル (初期は折りたたみ) -->
+        <div id="offsetPanel" class="hidden flex flex-col gap-2 pt-2 border-t border-slate-800/80 text-xs">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            <!-- 動画 Offset -->
+            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-300">動画 Offset (秒)</span>
+                <span class="text-[10px] text-slate-500">正で動画を進める / 負で遅らせる</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button data-target="video" data-delta="-0.1" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">-0.1</button>
+                <button data-target="video" data-delta="-0.01" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">-0.01</button>
+                <input id="videoOffsetInput" type="number" step="0.01" value="0" class="flex-1 min-w-[64px] bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-center font-mono-num font-bold text-amber-300 focus:outline-none focus:border-amber-400">
+                <button data-target="video" data-delta="0.01" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">+0.01</button>
+                <button data-target="video" data-delta="0.1" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">+0.1</button>
+              </div>
+            </div>
+
+            <!-- MIDI音程バー Offset -->
+            <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-cyan-300">MIDI音程バー Offset (秒)</span>
+                <span class="text-[10px] text-slate-500">正でバーを進める / 負で遅らせる</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button data-target="midi" data-delta="-0.1" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">-0.1</button>
+                <button data-target="midi" data-delta="-0.01" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">-0.01</button>
+                <input id="midiOffsetInput" type="number" step="0.01" value="0" class="flex-1 min-w-[64px] bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-center font-mono-num font-bold text-cyan-300 focus:outline-none focus:border-cyan-400">
+                <button data-target="midi" data-delta="0.01" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">+0.01</button>
+                <button data-target="midi" data-delta="0.1" class="btn-offset-nudge touch-press px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 font-mono-num text-slate-200 border border-slate-700">+0.1</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-1">
+            <span id="offsetSummaryText" class="font-mono-num text-[11px] text-slate-400">動画: 0.000s / MIDI: 0.000s</span>
+            <div class="flex items-center gap-2">
+              <button id="btnCopyOffsets" class="touch-press px-2.5 py-1 rounded-lg bg-cyan-950/70 hover:bg-cyan-900/70 text-cyan-300 border border-cyan-700/50 font-bold text-[11px]">値をコピー</button>
+              <button id="btnResetOffsets" class="touch-press px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px]">初期値に戻す</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 同期再生用の WAV 音源要素 (非表示) -->
+      <audio id="harmonyAudio" preload="auto"></audio>
+      <audio id="originalAudio" preload="auto"></audio>
+
+      <!-- カラオケ音程バー & ビデオプレイヤーカード -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-2 sm:p-3 shadow-sm flex flex-col gap-2">
+
+        <!-- カラオケ音程バー (動画の上に配置) -->
+        <div class="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden flex flex-col">
+          <div class="flex items-center justify-between px-2.5 py-1 border-b border-slate-800/80 bg-slate-900/60">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-bold text-cyan-300">音程バー (MIDI)</span>
+              <span id="currentPitchBadge" class="font-mono-num text-[11px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">--</span>
+            </div>
+            <button id="btnTogglePitchBar" class="touch-press text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">隠す</button>
+          </div>
+          <div id="pitchCanvasWrap" class="relative w-full h-16 sm:h-20 md:h-24">
+            <canvas id="pitchCanvas" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+
+        <!-- ビデオ画面本体 (消音・横画面でも収まる高さ制限) -->
+        <div class="relative w-full aspect-video max-h-[38vh] md:max-h-[40vh] bg-black rounded-xl overflow-hidden flex items-center justify-center border border-slate-950 mx-auto">
+          <video id="videoElement" playsinline muted preload="auto" class="w-full h-full object-contain"></video>
+          <div id="videoErrorOverlay" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center text-center p-4 gap-2">
+            <p class="text-sm font-bold text-rose-400">video.mp4 を読み込めませんでした</p>
+            <p class="text-xs text-slate-400 max-w-md">同じフォルダに video.mp4 があるか確認してください。</p>
+          </div>
+        </div>
+
+        <!-- 現在セクション & タイム表示 -->
+        <div class="flex flex-col gap-1.5 pt-0.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase bg-slate-950 px-2 py-0.5 rounded border border-slate-800 shrink-0">NOW</span>
+              <span id="activeMarkerLabel" class="text-base sm:text-xl md:text-2xl font-black text-cyan-400 tracking-wide truncate">--</span>
+            </div>
+            <div class="flex items-baseline gap-1.5 font-mono-num shrink-0">
+              <span id="currentTimeDisplay" class="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white">00:00.000</span>
+              <span class="text-slate-600 text-xs">/</span>
+              <span id="totalDurationDisplay" class="text-xs md:text-sm text-slate-400">04:42.357</span>
+            </div>
+          </div>
+
+          <!-- シークバー & マーカーピン -->
+          <div class="relative w-full h-11 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 cursor-pointer select-none touch-none" id="timelineContainer">
+            <div id="playedBar" class="absolute top-0 bottom-0 left-0 bg-cyan-950/50 pointer-events-none" style="width: 0%;"></div>
+            <div id="playhead" class="absolute top-0 bottom-0 w-[2px] bg-cyan-400 pointer-events-none z-20 -translate-x-1/2 shadow-[0_0_10px_#22d3ee]" style="left: 0%;"></div>
+            <div id="markerPinsOverlay" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+          </div>
+        </div>
+
+        <!-- 練習サポートオプション (助走・速度) -->
+        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80 text-xs">
+          <!-- 助走再生 -->
+          <div class="flex items-center justify-between bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+            <button id="btnPrerollToggle" class="touch-press flex items-center gap-1.5 font-bold text-slate-400 hover:text-slate-200 transition">
+              <span id="prerollDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span>助走</span>
+            </button>
+            <select id="prerollSecSelect" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-cyan-300 font-mono-num font-bold focus:outline-none cursor-pointer">
+              <option value="1">1秒</option>
+              <option value="2" selected>2秒</option>
+              <option value="3">3秒</option>
+              <option value="4">4秒</option>
+              <option value="5">5秒</option>
+            </select>
+          </div>
+
+          <!-- 再生速度 -->
+          <div class="flex items-center justify-between bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+            <span class="text-slate-400 font-semibold">速度</span>
+            <select id="playbackRateSelect" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-cyan-300 font-mono-num font-bold focus:outline-none cursor-pointer">
+              <option value="0.7">0.7x</option>
+              <option value="0.8">0.8x</option>
+              <option value="0.9">0.9x</option>
+              <option value="1" selected>1.0x</option>
+              <option value="1.1">1.1x</option>
+              <option value="1.25">1.25x</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- PC用 トランスポートバー -->
+        <div class="hidden md:flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+          <div class="flex items-center gap-1.5">
+            <button id="btnPcPrevCue" class="touch-press px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-bold text-xs text-slate-200" title="前のセクション (↑)">← 前Cue</button>
+            <button id="btnPcNextCue" class="touch-press px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-bold text-xs text-slate-200" title="次のセクション (↓)">次Cue →</button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btnPcRewind" class="touch-press px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-mono-num font-bold text-xs text-slate-200 shadow-sm">-5s</button>
+            <button id="btnPcPlayPause" class="touch-press px-6 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm shadow flex items-center gap-1.5">
+              <svg id="pcPlayIcon" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+              <svg id="pcPauseIcon" class="w-4 h-4 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+              <span id="btnPcPlayText">再生</span>
+            </button>
+            <button id="btnPcForward" class="touch-press px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-mono-num font-bold text-xs text-slate-200 shadow-sm">+5s</button>
+          </div>
+
+          <button id="btnPcAddMarker" class="touch-press px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
+            <span>マーク追加 (M)</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 右カラム: 練習パッド / マーカー編集 -->
+    <div class="flex-1 w-full min-h-0 flex flex-col md:overflow-hidden">
+
+      <!-- VIEW 1: 練習モード (CUE PADS) -->
+      <div id="playView" class="flex-1 flex flex-col gap-2 md:overflow-hidden">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">CUE PADS (タップで頭出し)</span>
+          <span class="text-xs text-slate-500 font-mono-num" id="playMarkerCount">0 個のキュー</span>
+        </div>
+        <div class="flex-1 md:overflow-y-auto pr-1">
+          <div id="playTilesGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3 pb-4"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: 編集モード -->
+      <div id="editView" class="hidden flex-1 flex flex-col gap-2 md:overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+          <span class="text-xs md:text-sm font-bold text-slate-400">登録マーカー (<span id="markerCountBadge">0</span>)</span>
+          <div class="flex items-center gap-2">
+            <button id="btnEditAddMarker" class="touch-press text-xs px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">+ 現在位置に追加</button>
+            <button id="sortMarkersBtn" class="touch-press text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">時間順に整列</button>
+            <button id="resetDefaultMarkersBtn" class="touch-press text-xs px-3 py-1.5 rounded-lg bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50">初期マーカーに戻す</button>
+          </div>
+        </div>
+
+        <div class="flex-1 md:overflow-y-auto pr-1 pb-4">
+          <div id="markersList" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- スマホ専用 ボトムコントローラー -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 px-3 py-2.5 pb-safe md:hidden shadow-lg">
+    <div class="max-w-md mx-auto flex items-center gap-2">
+      <button id="btnMobilePrevCue" class="touch-press px-2.5 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold shrink-0">前Cue</button>
+      <button id="btnRewind5s" class="touch-press w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center shrink-0">
+        <span class="text-xs font-mono-num font-bold">-5s</span>
+      </button>
+
+      <button id="btnPlayPause" class="touch-press flex-1 h-12 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center shadow font-black gap-1.5">
+        <svg id="playIcon" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+        <svg id="pauseIcon" class="w-5 h-5 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+        <span id="btnMobilePlayText" class="text-sm">再生</span>
+      </button>
+
+      <button id="btnForward5s" class="touch-press w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center shrink-0">
+        <span class="text-xs font-mono-num font-bold">+5s</span>
+      </button>
+      <button id="btnMobileNextCue" class="touch-press px-2.5 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold shrink-0">次Cue</button>
+    </div>
+  </nav>
+
+  <!-- トースト -->
+  <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 bg-slate-800/95 text-cyan-300 border border-cyan-500/40 px-4 py-2 rounded-xl shadow-xl opacity-0 pointer-events-none transition duration-150 z-50 text-xs md:text-sm font-medium whitespace-nowrap">
+    <span id="toastMsg">通知</span>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'hitotarashi_harmony_practice_v3';
+    const DEFAULT_VIDEO_OFFSET_SEC = -1.300;
+    const DEFAULT_MIDI_OFFSET_SEC = 0.000;
+
+    const MEDIA_FILES = {
+      video: './video.mp4',
+      harmony: './ひとたらし ハモリ.wav',
+      original: './ひとたらし原曲.wav'
+    };
+
+    const DEFAULT_MARKERS = [
+      { id: 1, name: "イントロ", note: "", timeSec: 1.6901360544217687, timeMs: 1690, color: "#06b6d4" },
+      { id: 2, name: "イントロ'", note: "", timeSec: 15.211269841269841, timeMs: 15211, color: "#06b6d4" },
+      { id: 3, name: "A", note: "", timeSec: 28.732403628117915, timeMs: 28732, color: "#06b6d4" },
+      { id: 4, name: "B", note: "", timeSec: 55.7746485260771, timeMs: 55775, color: "#06b6d4" },
+      { id: 5, name: "サビ", note: "", timeSec: 72.67605442176871, timeMs: 72676, color: "#06b6d4" },
+      { id: 6, name: "間奏", note: "", timeSec: 99.71829931972789, timeMs: 99718, color: "#06b6d4" },
+      { id: 7, name: "2A", note: "", timeSec: 113.23943310657596, timeMs: 113239, color: "#06b6d4" },
+      { id: 8, name: "2B", note: "", timeSec: 140.2817006802721, timeMs: 140282, color: "#06b6d4" },
+      { id: 9, name: "2サビ", note: "", timeSec: 157.1831065759637, timeMs: 157183, color: "#06b6d4" },
+      { id: 10, name: "間奏", note: "", timeSec: 184.2253514739229, timeMs: 184225, color: "#06b6d4" },
+      { id: 11, name: "ストリングス間奏", note: "", timeSec: 190.98591836734693, timeMs: 190986, color: "#06b6d4" },
+      { id: 12, name: "ラスサビ", note: "", timeSec: 211.2675963718821, timeMs: 211268, color: "#06b6d4" },
+      { id: 13, name: "後奏", note: "", timeSec: 238.30986394557823, timeMs: 238310, color: "#06b6d4" },
+      { id: 14, name: "三拍子後奏", note: "", timeSec: 265.3521088435374, timeMs: 265352, color: "#06b6d4" }
+    ];
+
+    // 「ひとたらし 2dありハモリ.mid」から抽出したノートデータ [midiPitch, startSec, endSec]
+    const DEFAULT_MIDI_NOTES = [[64,72.0422,72.2535],[66,72.2535,72.4648],[67,72.4648,72.8873],[67,72.8873,73.0986],[65,73.0986,73.3098],[64,73.3098,73.5211],[65,73.5211,73.9436],[64,73.9436,74.1549],[67,74.1549,74.5774],[67,74.5774,74.7887],[65,74.7887,75.0],[64,75.0,75.2112],[65,75.2112,75.4225],[64,75.4225,75.845],[64,78.8028,79.014],[66,79.014,79.2253],[67,79.2253,79.6478],[67,79.6478,79.8591],[65,79.8591,80.0704],[64,80.0704,80.2816],[65,80.2816,80.7042],[64,80.7042,80.9155],[67,80.9155,81.338],[67,81.338,81.5493],[65,81.5493,81.7605],[64,81.7605,81.9718],[65,81.9718,82.1831],[64,82.1831,82.6056],[64,85.5633,85.7746],[66,85.7746,85.9859],[67,85.9859,86.4084],[67,86.4084,86.6197],[65,86.6197,86.8309],[64,86.8309,87.0422],[65,87.0422,87.2535],[64,87.4647,87.676],[67,87.676,88.0985],[67,88.0985,88.3098],[65,88.3098,88.5211],[64,88.5211,88.7323],[65,88.7323,88.9436],[64,88.9436,89.3662],[64,92.3239,92.5352],[66,92.5352,92.7464],[67,92.7464,93.169],[67,93.169,93.3802],[65,93.3802,93.5915],[64,93.5915,93.8028],[65,93.8028,94.014],[64,94.014,94.4366],[67,94.4366,94.8591],[67,94.8591,95.0704],[65,95.0704,95.2816],[64,95.2816,95.4929],[65,95.4929,95.7042],[64,95.7042,96.1267],[64,96.7605,96.9718],[64,96.9718,97.183],[64,97.183,97.3943],[64,97.3943,97.6056],[64,97.6056,97.8169],[64,97.8169,98.0281],[64,98.0281,98.2394],[62,98.2394,98.6619],[62,98.6619,99.0845],[64,99.0845,99.2957],[62,99.2957,99.507],[60,99.507,100.5633],[71,109.8591,110.2816],[71,110.2816,110.3873],[71,110.3873,110.9154],[71,110.9154,111.0211],[71,111.0211,111.5492],[71,111.5492,111.6549],[71,111.6549,112.183],[71,112.183,112.2887],[71,112.2887,113.2394],[65,119.9999,120.2112],[67,120.2112,120.6337],[69,120.6337,121.0563],[71,121.0563,121.4788],[72,121.4788,122.1126],[74,122.1126,122.3239],[72,122.3239,122.7464],[67,122.7464,122.9577],[67,122.9577,123.169],[72,123.3802,124.014],[70,124.014,124.2253],[70,124.2253,125.4929],[64,126.7605,126.9718],[64,126.9718,127.2887],[64,127.3943,127.8168],[64,127.8168,128.2394],[64,128.2394,128.4506],[64,128.6619,129.0844],[67,129.0844,129.9295],[62,129.9295,130.1408],[62,130.1408,130.352],[62,130.352,130.5633],[62,130.5633,130.7746],[62,130.7746,130.9858],[62,130.9858,131.1971],[62,131.1971,131.4084],[62,131.4084,131.6197],[64,131.6197,131.8309],[62,131.8309,132.676],[65,133.5211,133.7323],[67,133.7323,134.1549],[69,134.1549,134.3661],[71,134.5774,134.9999],[72,134.9999,135.4225],[74,135.4225,135.845],[72,135.845,136.2675],[67,136.4788,136.6901],[67,136.6901,136.9013],[72,136.9013,137.5351],[70,137.5351,137.7464],[70,137.7464,138.5915],[71,138.5915,139.8591],[64,156.5492,156.7605],[66,156.7605,156.9718],[67,156.9718,157.3943],[67,157.3943,157.6056],[65,157.6056,157.8168],[64,157.8168,158.0281],[65,158.0281,158.4506],[64,158.4506,158.6619],[67,158.6619,159.0844],[67,159.0844,159.2957],[65,159.2957,159.507],[64,159.507,159.7182],[65,159.7182,159.9295],[64,159.9295,160.352],[64,163.3098,163.521],[66,163.521,163.7323],[67,163.7323,164.1548],[67,164.1548,164.3661],[65,164.3661,164.5774],[64,164.5774,164.7886],[65,164.7886,165.2112],[64,165.2112,165.4225],[67,165.4225,165.845],[67,165.845,166.0563],[65,166.0563,166.2675],[64,166.2675,166.4788],[65,166.4788,166.6901],[64,166.6901,167.1126],[64,170.0703,170.2816],[66,170.2816,170.4929],[67,170.4929,170.9154],[67,170.9154,171.1267],[65,171.1267,171.3379],[64,171.3379,171.5492],[65,171.5492,171.8661],[65,171.8661,171.9717],[64,171.9717,172.183],[67,172.183,172.6055],[67,172.6055,172.8168],[65,172.8168,173.0281],[64,173.0281,173.2394],[65,173.2394,173.4506],[64,173.4506,173.8732],[64,176.8309,177.0422],[66,177.0422,177.2534],[67,177.2534,177.676],[67,177.676,177.8872],[65,177.8872,178.0985],[64,178.0985,178.3098],[65,178.3098,178.521],[64,178.521,178.9436],[67,178.9436,179.3661],[67,179.3661,179.5774],[65,179.5774,179.7886],[64,179.7886,179.9999],[65,179.9999,180.2112],[64,180.2112,180.6337],[64,181.2675,181.4788],[64,181.4788,181.69],[64,181.69,181.9013],[64,181.9013,182.1126],[64,182.1126,182.3239],[64,182.3239,182.5351],[64,182.5351,182.7464],[62,182.7464,183.1689],[62,183.1689,183.5915],[64,183.5915,183.8027],[62,183.8027,184.014],[60,184.014,185.0703],[64,210.6337,210.845],[66,210.845,211.0562],[67,211.0562,211.4788],[67,211.4788,211.69],[65,211.69,211.9013],[64,211.9013,212.1126],[65,212.1126,212.5351],[64,212.5351,212.7464],[67,212.7464,213.1689],[67,213.1689,213.3802],[65,213.3802,213.5914],[64,213.5914,213.8027],[65,213.8027,214.014],[64,214.014,214.4365],[64,217.3943,217.6055],[66,217.6055,217.8168],[67,217.8168,218.2393],[67,218.2393,218.4506],[65,218.4506,218.6619],[64,218.6619,218.8731],[65,218.8731,219.2957],[64,219.2957,219.5069],[67,219.5069,219.9295],[67,219.9295,220.1407],[65,220.1407,220.352],[64,220.352,220.5633],[65,220.5633,220.7745],[64,220.7745,221.1971],[64,224.1548,224.3661],[66,224.3661,224.5774],[67,224.5774,224.9999],[67,224.9999,225.2112],[65,225.2112,225.4224],[64,225.4224,225.6337],[65,225.6337,225.845],[64,226.0562,226.2675],[67,226.2675,226.69],[67,226.69,226.9013],[65,226.9013,227.1126],[64,227.1126,227.3238],[65,227.3238,227.5351],[64,227.5351,227.9576],[64,230.9154,231.1266],[66,231.1266,231.3379],[67,231.3379,231.7604],[67,231.7604,231.9717],[65,231.9717,232.183],[64,232.183,232.3942],[65,232.3942,232.6055],[64,232.6055,233.0281],[67,233.0281,233.4506],[67,233.4506,233.6619],[65,233.6619,233.8731],[64,233.8731,234.0844],[65,234.0844,234.2957],[64,234.2957,234.7182],[64,235.352,235.5633],[64,235.5633,235.7745],[64,235.7745,235.9858],[64,235.9858,236.1971],[64,236.1971,236.4083],[64,236.4083,236.6196],[64,236.6196,236.8309],[62,236.8309,237.2534],[62,237.2534,237.6759],[64,237.6759,237.8872],[62,237.8872,238.0985],[60,238.0985,239.1548],[71,248.4506,248.8731],[71,248.8731,248.9787],[71,248.9787,249.5069],[71,249.5069,249.6126],[71,249.6126,250.1407],[71,250.1407,250.2464],[71,250.2464,250.7745],[71,250.7745,250.8802],[71,250.8802,251.8309],[71,261.9717,262.3942],[71,262.3942,262.4999],[71,262.4999,263.028],[71,263.028,263.1337],[71,263.1337,263.6618],[71,263.6618,263.7675],[71,263.7675,264.2956],[71,264.2956,264.4013],[71,264.4013,265.352]];
+
+    const state = {
+      mode: 'play',
+      audioDuration: 282.35755102040815,
+      videoDuration: 0,
+      markers: [],
+      currentMarkerIndex: -1,
+      prerollEnabled: false,
+      prerollSec: 2,
+      playbackRate: 1.0,
+      harmonyVolume: 1.0,
+      originalVolume: 0.85,
+      harmonyMuted: false,
+      originalMuted: false,
+      videoOffsetSec: DEFAULT_VIDEO_OFFSET_SEC,
+      midiOffsetSec: DEFAULT_MIDI_OFFSET_SEC,
+      showPitchBar: true,
+      isCountdown: false
+    };
+
+    let isScrubbing = false;
+    let countdownTimer = null;
+    let rafId = null;
+
+    // DOM参照
+    const videoElement = document.getElementById('videoElement');
+    const videoErrorOverlay = document.getElementById('videoErrorOverlay');
+    const harmonyAudio = document.getElementById('harmonyAudio');
+    const originalAudio = document.getElementById('originalAudio');
+
+    const btnMuteHarmony = document.getElementById('btnMuteHarmony');
+    const harmonyVolumeSlider = document.getElementById('harmonyVolumeSlider');
+    const harmonyVolumeVal = document.getElementById('harmonyVolumeVal');
+    const btnMuteOriginal = document.getElementById('btnMuteOriginal');
+    const originalVolumeSlider = document.getElementById('originalVolumeSlider');
+    const originalVolumeVal = document.getElementById('originalVolumeVal');
+
+    const btnToggleOffsetPanel = document.getElementById('btnToggleOffsetPanel');
+    const offsetPanel = document.getElementById('offsetPanel');
+    const videoOffsetInput = document.getElementById('videoOffsetInput');
+    const midiOffsetInput = document.getElementById('midiOffsetInput');
+    const offsetSummaryText = document.getElementById('offsetSummaryText');
+    const btnCopyOffsets = document.getElementById('btnCopyOffsets');
+    const btnResetOffsets = document.getElementById('btnResetOffsets');
+
+    const btnTogglePitchBar = document.getElementById('btnTogglePitchBar');
+    const pitchCanvasWrap = document.getElementById('pitchCanvasWrap');
+    const pitchCanvas = document.getElementById('pitchCanvas');
+    const currentPitchBadge = document.getElementById('currentPitchBadge');
+
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const totalDurationDisplay = document.getElementById('totalDurationDisplay');
+    const activeMarkerLabel = document.getElementById('activeMarkerLabel');
+    const markerCountBadge = document.getElementById('markerCountBadge');
+    const playMarkerCount = document.getElementById('playMarkerCount');
+
+    const timelineContainer = document.getElementById('timelineContainer');
+    const playedBar = document.getElementById('playedBar');
+    const playhead = document.getElementById('playhead');
+    const markerPinsOverlay = document.getElementById('markerPinsOverlay');
+
+    const btnPrerollToggle = document.getElementById('btnPrerollToggle');
+    const prerollDot = document.getElementById('prerollDot');
+    const prerollSecSelect = document.getElementById('prerollSecSelect');
+    const playbackRateSelect = document.getElementById('playbackRateSelect');
+
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const btnMobilePlayText = document.getElementById('btnMobilePlayText');
+    const btnRewind5s = document.getElementById('btnRewind5s');
+    const btnForward5s = document.getElementById('btnForward5s');
+    const btnMobilePrevCue = document.getElementById('btnMobilePrevCue');
+    const btnMobileNextCue = document.getElementById('btnMobileNextCue');
+
+    const btnPcPlayPause = document.getElementById('btnPcPlayPause');
+    const pcPlayIcon = document.getElementById('pcPlayIcon');
+    const pcPauseIcon = document.getElementById('pcPauseIcon');
+    const btnPcPlayText = document.getElementById('btnPcPlayText');
+    const btnPcRewind = document.getElementById('btnPcRewind');
+    const btnPcForward = document.getElementById('btnPcForward');
+    const btnPcPrevCue = document.getElementById('btnPcPrevCue');
+    const btnPcNextCue = document.getElementById('btnPcNextCue');
+    const btnPcAddMarker = document.getElementById('btnPcAddMarker');
+    const btnEditAddMarker = document.getElementById('btnEditAddMarker');
+
+    const btnModePlay = document.getElementById('btnModePlay');
+    const btnModeEdit = document.getElementById('btnModeEdit');
+    const playView = document.getElementById('playView');
+    const editView = document.getElementById('editView');
+    const playTilesGrid = document.getElementById('playTilesGrid');
+    const markersList = document.getElementById('markersList');
+    const sortMarkersBtn = document.getElementById('sortMarkersBtn');
+    const resetDefaultMarkersBtn = document.getElementById('resetDefaultMarkersBtn');
+
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toastMsg');
+
+    // ==========================================
+    // 状態保存・復元 (localStorage)
+    // ==========================================
+    function cloneDefaultMarkers() {
+      return DEFAULT_MARKERS.map(m => ({ ...m }));
+    }
+
+    function saveState() {
+      try {
+        const payload = {
+          markers: state.markers,
+          prerollEnabled: state.prerollEnabled,
+          prerollSec: state.prerollSec,
+          playbackRate: state.playbackRate,
+          harmonyVolume: state.harmonyVolume,
+          originalVolume: state.originalVolume,
+          harmonyMuted: state.harmonyMuted,
+          originalMuted: state.originalMuted,
+          videoOffsetSec: state.videoOffsetSec,
+          midiOffsetSec: state.midiOffsetSec,
+          showPitchBar: state.showPitchBar
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('Save failed:', e);
+      }
+    }
+
+    function loadSavedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          state.markers = cloneDefaultMarkers();
+          return;
+        }
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved.markers) && saved.markers.length > 0) {
+          state.markers = saved.markers.map((m, i) => normalizeMarker(m, i));
+        } else {
+          state.markers = cloneDefaultMarkers();
+        }
+        if (typeof saved.prerollEnabled === 'boolean') state.prerollEnabled = saved.prerollEnabled;
+        if (typeof saved.prerollSec === 'number') state.prerollSec = saved.prerollSec;
+        if (typeof saved.playbackRate === 'number') state.playbackRate = saved.playbackRate;
+        if (typeof saved.harmonyVolume === 'number') state.harmonyVolume = saved.harmonyVolume;
+        if (typeof saved.originalVolume === 'number') state.originalVolume = saved.originalVolume;
+        if (typeof saved.harmonyMuted === 'boolean') state.harmonyMuted = saved.harmonyMuted;
+        if (typeof saved.originalMuted === 'boolean') state.originalMuted = saved.originalMuted;
+        if (typeof saved.videoOffsetSec === 'number') state.videoOffsetSec = saved.videoOffsetSec;
+        if (typeof saved.midiOffsetSec === 'number') state.midiOffsetSec = saved.midiOffsetSec;
+        if (typeof saved.showPitchBar === 'boolean') state.showPitchBar = saved.showPitchBar;
+      } catch (e) {
+        state.markers = cloneDefaultMarkers();
+      }
+    }
+
+    function normalizeMarker(m, idx = 0) {
+      const timeMs = typeof m.timeMs === 'number'
+        ? Math.round(m.timeMs)
+        : (typeof m.timeSec === 'number' ? Math.round(m.timeSec * 1000) : 0);
+      const timeSec = typeof m.timeSec === 'number' ? m.timeSec : timeMs / 1000;
+      return {
+        id: m.id ?? ('m_' + idx + '_' + Date.now()),
+        name: m.name || m.label || `Cue ${idx + 1}`,
+        note: m.note || '',
+        timeSec,
+        timeMs,
+        color: m.color || '#06b6d4'
+      };
+    }
+
+    // ==========================================
+    // メディア初期化 & ミキサー / 同期制御
+    // ==========================================
+    function initMedia() {
+      videoElement.muted = true;
+      videoElement.volume = 0;
+      videoElement.src = MEDIA_FILES.video;
+      videoElement.load();
+
+      harmonyAudio.src = MEDIA_FILES.harmony;
+      harmonyAudio.load();
+
+      originalAudio.src = MEDIA_FILES.original;
+      originalAudio.load();
+
+      videoElement.addEventListener('loadedmetadata', () => {
+        state.videoDuration = videoElement.duration || 0;
+        syncVideoToAudio(harmonyAudio.currentTime || 0);
+      });
+
+      videoElement.addEventListener('error', () => {
+        videoErrorOverlay.classList.remove('hidden');
+      });
+
+      harmonyAudio.addEventListener('loadedmetadata', () => {
+        state.audioDuration = harmonyAudio.duration || state.audioDuration;
+        totalDurationDisplay.textContent = formatTime(state.audioDuration);
+        renderMarkerPins();
+        updateProgress();
+      });
+
+      applyMixerVolumes();
+    }
+
+    function applyMixerVolumes() {
+      harmonyAudio.volume = state.harmonyMuted ? 0 : state.harmonyVolume;
+      originalAudio.volume = state.originalMuted ? 0 : state.originalVolume;
+      videoElement.muted = true;
+      videoElement.volume = 0;
+    }
+
+    function updateMixerUI() {
+      const hPct = Math.round(state.harmonyVolume * 100);
+      const oPct = Math.round(state.originalVolume * 100);
+      harmonyVolumeSlider.value = String(hPct);
+      originalVolumeSlider.value = String(oPct);
+      harmonyVolumeVal.textContent = state.harmonyMuted ? 'MUTE' : `${hPct}%`;
+      originalVolumeVal.textContent = state.originalMuted ? 'MUTE' : `${oPct}%`;
+
+      btnMuteHarmony.className = state.harmonyMuted
+        ? 'touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-rose-950/70 text-rose-300 border border-rose-700/50 shrink-0'
+        : 'touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-cyan-950/70 text-cyan-300 border border-cyan-700/50 shrink-0';
+      btnMuteOriginal.className = state.originalMuted
+        ? 'touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-rose-950/70 text-rose-300 border border-rose-700/50 shrink-0'
+        : 'touch-press px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-700/50 shrink-0';
+
+      applyMixerVolumes();
+    }
+
+    harmonyVolumeSlider.addEventListener('input', (e) => {
+      state.harmonyVolume = parseInt(e.target.value, 10) / 100;
+      if (state.harmonyVolume > 0) state.harmonyMuted = false;
+      updateMixerUI();
+      saveState();
+    });
+
+    originalVolumeSlider.addEventListener('input', (e) => {
+      state.originalVolume = parseInt(e.target.value, 10) / 100;
+      if (state.originalVolume > 0) state.originalMuted = false;
+      updateMixerUI();
+      saveState();
+    });
+
+    btnMuteHarmony.addEventListener('click', () => {
+      state.harmonyMuted = !state.harmonyMuted;
+      updateMixerUI();
+      saveState();
+    });
+
+    btnMuteOriginal.addEventListener('click', () => {
+      state.originalMuted = !state.originalMuted;
+      updateMixerUI();
+      saveState();
+    });
+
+    function syncVideoToAudio(audioTime) {
+      if (videoElement.readyState < 1) return;
+      const maxVid = state.videoDuration || videoElement.duration || 9999;
+      const targetVid = audioTime + state.videoOffsetSec;
+      if (targetVid < 0) {
+        if (!videoElement.paused) videoElement.pause();
+        videoElement.currentTime = 0;
+      } else if (targetVid >= maxVid) {
+        if (!videoElement.paused) videoElement.pause();
+        videoElement.currentTime = maxVid;
+      } else {
+        videoElement.currentTime = targetVid;
+      }
+    }
+
+    function syncAllMediaTime(audioTime) {
+      harmonyAudio.currentTime = audioTime;
+      if (originalAudio.readyState >= 1) {
+        originalAudio.currentTime = audioTime;
+      }
+      syncVideoToAudio(audioTime);
+      drawPitchBar();
+    }
+
+    function playSynced() {
+      const rate = state.playbackRate;
+      harmonyAudio.playbackRate = rate;
+      originalAudio.playbackRate = rate;
+      videoElement.playbackRate = rate;
+      applyMixerVolumes();
+
+      const cur = harmonyAudio.currentTime;
+      if (originalAudio.readyState >= 1) {
+        originalAudio.currentTime = cur;
+      }
+      originalAudio.play().catch(() => {});
+
+      const targetVid = cur + state.videoOffsetSec;
+      const maxVid = state.videoDuration || videoElement.duration || 9999;
+      if (videoElement.readyState >= 1 && targetVid >= 0 && targetVid < maxVid) {
+        videoElement.currentTime = targetVid;
+        videoElement.play().catch(() => {});
+      }
+
+      harmonyAudio.play().then(() => {
+        setPlaybackUI(true);
+        startRafLoop();
+      }).catch(() => {
+        originalAudio.pause();
+        videoElement.pause();
+        setPlaybackUI(false);
+      });
+    }
+
+    function pauseSynced() {
+      harmonyAudio.pause();
+      originalAudio.pause();
+      videoElement.pause();
+      stopRafLoop();
+    }
+
+    // ==========================================
+    // Offset 調整 UI
+    // ==========================================
+    function updateOffsetUI() {
+      videoOffsetInput.value = state.videoOffsetSec.toFixed(3);
+      midiOffsetInput.value = state.midiOffsetSec.toFixed(3);
+      const vSign = state.videoOffsetSec >= 0 ? '+' : '';
+      const mSign = state.midiOffsetSec >= 0 ? '+' : '';
+      offsetSummaryText.textContent = `動画: ${vSign}${state.videoOffsetSec.toFixed(3)}s / MIDI: ${mSign}${state.midiOffsetSec.toFixed(3)}s`;
+    }
+
+    btnToggleOffsetPanel.addEventListener('click', () => {
+      const hidden = offsetPanel.classList.toggle('hidden');
+      btnToggleOffsetPanel.textContent = hidden ? 'Offset調整 ▸' : 'Offset調整 ▾';
+    });
+
+    document.querySelectorAll('.btn-offset-nudge').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        const delta = parseFloat(btn.getAttribute('data-delta'));
+        if (target === 'video') {
+          state.videoOffsetSec = Math.round((state.videoOffsetSec + delta) * 1000) / 1000;
+          syncVideoToAudio(harmonyAudio.currentTime || 0);
+        } else {
+          state.midiOffsetSec = Math.round((state.midiOffsetSec + delta) * 1000) / 1000;
+          drawPitchBar();
+        }
+        updateOffsetUI();
+        saveState();
+      });
+    });
+
+    videoOffsetInput.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      state.videoOffsetSec = isNaN(val) ? 0 : Math.round(val * 1000) / 1000;
+      syncVideoToAudio(harmonyAudio.currentTime || 0);
+      updateOffsetUI();
+      saveState();
+    });
+
+    midiOffsetInput.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      state.midiOffsetSec = isNaN(val) ? 0 : Math.round(val * 1000) / 1000;
+      drawPitchBar();
+      updateOffsetUI();
+      saveState();
+    });
+
+    btnCopyOffsets.addEventListener('click', () => {
+      const text = `動画Offset: ${state.videoOffsetSec.toFixed(3)}s / MIDI Offset: ${state.midiOffsetSec.toFixed(3)}s`;
+      navigator.clipboard?.writeText(text).then(() => {
+        showToast('Offset値をコピーしました');
+      }).catch(() => {
+        showToast(text);
+      });
+    });
+
+    btnResetOffsets.addEventListener('click', () => {
+      state.videoOffsetSec = DEFAULT_VIDEO_OFFSET_SEC;
+      state.midiOffsetSec = DEFAULT_MIDI_OFFSET_SEC;
+      syncVideoToAudio(harmonyAudio.currentTime || 0);
+      drawPitchBar();
+      updateOffsetUI();
+      saveState();
+      showToast('Offsetを初期値 (-1.300s / 0.000s) に戻しました');
+    });
+
+    // ==========================================
+    // カラオケ音程バー (MIDI Pitch Bar)
+    // ==========================================
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    function midiToName(midi) {
+      const name = NOTE_NAMES[midi % 12];
+      const oct = Math.floor(midi / 12) - 1;
+      return `${name}${oct}`;
+    }
+
+    function updatePitchBarVisibility() {
+      pitchCanvasWrap.classList.toggle('hidden', !state.showPitchBar);
+      btnTogglePitchBar.textContent = state.showPitchBar ? '隠す' : '表示';
+      if (state.showPitchBar) drawPitchBar();
+    }
+
+    btnTogglePitchBar.addEventListener('click', () => {
+      state.showPitchBar = !state.showPitchBar;
+      updatePitchBarVisibility();
+      saveState();
+    });
+
+    function drawPitchBar() {
+      if (!state.showPitchBar) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = pitchCanvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      if (pitchCanvas.width !== Math.round(rect.width * dpr) || pitchCanvas.height !== Math.round(rect.height * dpr)) {
+        pitchCanvas.width = Math.round(rect.width * dpr);
+        pitchCanvas.height = Math.round(rect.height * dpr);
+      }
+
+      const ctx = pitchCanvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width;
+      const H = rect.height;
+      const labelColW = 36;
+      const minPitch = 58; // A#3
+      const maxPitch = 76; // E5
+      const pitchSpan = maxPitch - minPitch + 1;
+      const rowH = H / pitchSpan;
+
+      // 背景
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, W, H);
+
+      // 音階グリッド & 左ラベル
+      ctx.font = 'bold 9px "JetBrains Mono", monospace';
+      ctx.textBaseline = 'middle';
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const y = (maxPitch - p) * rowH;
+        const pc = p % 12;
+        const isBlack = [1, 3, 6, 8, 10].includes(pc);
+        if (isBlack) {
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          ctx.fillRect(labelColW, y, W - labelColW, rowH);
+        }
+        ctx.strokeStyle = pc === 0 ? 'rgba(56, 189, 248, 0.22)' : 'rgba(51, 65, 85, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(labelColW, y + rowH);
+        ctx.lineTo(W, y + rowH);
+        ctx.stroke();
+
+        if (pc === 0 || pc === 4 || pc === 7) {
+          ctx.fillStyle = pc === 0 ? '#38bdf8' : '#64748b';
+          ctx.fillText(midiToName(p), 4, y + rowH / 2);
+        }
+      }
+
+      // 左ラベル区切り
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, labelColW - 1, H);
+      for (let p = minPitch; p <= maxPitch; p++) {
+        const pc = p % 12;
+        if (pc === 0 || pc === 4 || pc === 7) {
+          const y = (maxPitch - p) * rowH;
+          ctx.fillStyle = pc === 0 ? '#38bdf8' : '#94a3b8';
+          ctx.fillText(midiToName(p), 4, y + rowH / 2);
+        }
+      }
+
+      // 時間ウィンドウ: プレイヘッドを左から25%の位置に配置 (-2秒 〜 +6秒)
+      const nowTime = (harmonyAudio.currentTime || 0) + state.midiOffsetSec;
+      const pastSec = 2.0;
+      const futureSec = 6.0;
+      const totalWin = pastSec + futureSec;
+      const rollW = W - labelColW;
+      const playheadX = labelColW + rollW * (pastSec / totalWin);
+      const pxPerSec = rollW / totalWin;
+
+      const winStart = nowTime - pastSec;
+      const winEnd = nowTime + futureSec;
+
+      let activeNoteName = '--';
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(labelColW, 0, rollW, H);
+      ctx.clip();
+
+      for (let i = 0; i < DEFAULT_MIDI_NOTES.length; i++) {
+        const [pitch, startS, endS] = DEFAULT_MIDI_NOTES[i];
+        if (endS < winStart) continue;
+        if (startS > winEnd) break;
+
+        const x1 = playheadX + (startS - nowTime) * pxPerSec;
+        const x2 = playheadX + (endS - nowTime) * pxPerSec;
+        const w = Math.max(3, x2 - x1 - 1);
+        const y = (maxPitch - pitch) * rowH + 1;
+        const h = Math.max(4, rowH - 2);
+        const isActive = nowTime >= startS && nowTime <= endS;
+        const isPast = endS < nowTime;
+
+        if (isActive) {
+          activeNoteName = midiToName(pitch);
+          ctx.fillStyle = '#fbbf24';
+          ctx.shadowColor = '#fbbf24';
+          ctx.shadowBlur = 10;
+        } else if (isPast) {
+          ctx.fillStyle = 'rgba(100, 116, 139, 0.45)';
+          ctx.shadowBlur = 0;
+        } else {
+          ctx.fillStyle = 'rgba(34, 211, 238, 0.65)';
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.beginPath();
+        ctx.roundRect(x1, y, w, h, 3);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (isActive) {
+          ctx.fillStyle = '#fef3c7';
+          ctx.font = 'bold 10px "JetBrains Mono", monospace';
+          ctx.fillText(activeNoteName, Math.max(labelColW + 2, x1 + 2), Math.max(8, y - 6));
+        }
+      }
+
+      // プレイヘッド縦線
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#22d3ee';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(playheadX, 0);
+      ctx.lineTo(playheadX, H);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+      ctx.restore();
+
+      if (currentPitchBadge.textContent !== activeNoteName) {
+        currentPitchBadge.textContent = activeNoteName;
+        currentPitchBadge.className = activeNoteName !== '--'
+          ? 'font-mono-num text-xs font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/50'
+          : 'font-mono-num text-xs font-black px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+      }
+    }
+
+    function startRafLoop() {
+      if (rafId) return;
+      const tick = () => {
+        if (!harmonyAudio.paused && !isScrubbing && !state.isCountdown) {
+          updateProgress();
+          drawPitchBar();
+
+          // 音声・動画のドリフト補正
+          const cur = harmonyAudio.currentTime;
+          if (originalAudio.readyState >= 2 && Math.abs(originalAudio.currentTime - cur) > 0.08) {
+            originalAudio.currentTime = cur;
+          }
+          const targetVid = cur + state.videoOffsetSec;
+          const maxVid = state.videoDuration || videoElement.duration || 9999;
+          if (videoElement.readyState >= 2) {
+            if (targetVid < 0 || targetVid >= maxVid) {
+              if (!videoElement.paused) videoElement.pause();
+            } else {
+              if (videoElement.paused) videoElement.play().catch(() => {});
+              if (Math.abs(videoElement.currentTime - targetVid) > 0.15) {
+                videoElement.currentTime = targetVid;
+              }
+            }
+          }
+          rafId = requestAnimationFrame(tick);
+        } else {
+          rafId = null;
+        }
+      };
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function stopRafLoop() {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    window.addEventListener('resize', () => drawPitchBar());
+
+    // ==========================================
+    // 練習オプション UI (助走・速度)
+    // ==========================================
+    function updateOptionsUI() {
+      if (state.prerollEnabled) {
+        btnPrerollToggle.classList.replace('text-slate-400', 'text-emerald-300');
+        prerollDot.classList.replace('bg-slate-500', 'bg-emerald-400');
+      } else {
+        btnPrerollToggle.classList.replace('text-emerald-300', 'text-slate-400');
+        prerollDot.classList.replace('bg-emerald-400', 'bg-slate-500');
+      }
+      prerollSecSelect.value = String(state.prerollSec);
+
+      playbackRateSelect.value = String(state.playbackRate);
+      harmonyAudio.playbackRate = state.playbackRate;
+      originalAudio.playbackRate = state.playbackRate;
+      videoElement.playbackRate = state.playbackRate;
+    }
+
+    btnPrerollToggle.addEventListener('click', () => {
+      state.prerollEnabled = !state.prerollEnabled;
+      updateOptionsUI();
+      saveState();
+      showToast(state.prerollEnabled ? `助走再生 ON (${state.prerollSec}秒手前)` : '助走再生 OFF');
+    });
+
+    prerollSecSelect.addEventListener('change', (e) => {
+      state.prerollSec = parseFloat(e.target.value) || 2;
+      saveState();
+      if (state.prerollEnabled) showToast(`助走秒数: ${state.prerollSec}秒`);
+    });
+
+    playbackRateSelect.addEventListener('change', (e) => {
+      state.playbackRate = parseFloat(e.target.value) || 1.0;
+      harmonyAudio.playbackRate = state.playbackRate;
+      originalAudio.playbackRate = state.playbackRate;
+      videoElement.playbackRate = state.playbackRate;
+      saveState();
+      showToast(`再生速度: ${state.playbackRate}x`);
+    });
+
+    // ==========================================
+    // 再生 & 助走カウントダウン
+    // ==========================================
+    function cancelCountdown() {
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+      state.isCountdown = false;
+      currentTimeDisplay.classList.remove('text-amber-400');
+    }
+
+    function startPlaybackWithPrerollCheck(targetSec) {
+      cancelCountdown();
+      if (!harmonyAudio.src) return;
+
+      if (state.prerollEnabled && targetSec < state.prerollSec) {
+        pauseSynced();
+        syncAllMediaTime(0);
+        updateProgress();
+
+        state.isCountdown = true;
+        setPlaybackUI(true);
+
+        const totalWaitMs = Math.round(state.prerollSec * 1000);
+        const startTime = Date.now();
+        currentTimeDisplay.classList.add('text-amber-400');
+        showToast(`再生まで ${state.prerollSec} 秒待機中...`);
+
+        countdownTimer = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, (totalWaitMs - elapsed) / 1000);
+          currentTimeDisplay.textContent = `WAIT 0${remaining.toFixed(1)}s`;
+
+          if (elapsed >= totalWaitMs) {
+            cancelCountdown();
+            currentTimeDisplay.textContent = formatTime(0);
+            playSynced();
+          }
+        }, 50);
+      } else {
+        const actualStartSec = (state.prerollEnabled && targetSec >= state.prerollSec)
+          ? targetSec - state.prerollSec
+          : targetSec;
+
+        syncAllMediaTime(actualStartSec);
+        playSynced();
+        updateProgress();
+      }
+    }
+
+    function togglePlayPause() {
+      if (!harmonyAudio.src) return;
+
+      if (state.isCountdown) {
+        cancelCountdown();
+        setPlaybackUI(false);
+        currentTimeDisplay.textContent = formatTime(harmonyAudio.currentTime);
+        showToast('待機をキャンセルしました');
+        return;
+      }
+
+      if (harmonyAudio.paused) {
+        playSynced();
+      } else {
+        pauseSynced();
+        setPlaybackUI(false);
+      }
+    }
+
+    btnPlayPause.addEventListener('click', togglePlayPause);
+    btnPcPlayPause.addEventListener('click', togglePlayPause);
+
+    // ==========================================
+    // タイムライン & マーカー描画
+    // ==========================================
+    function formatTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) seconds = 0;
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 1000);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+    }
+
+    function formatTimeMs(ms) {
+      return formatTime(ms / 1000);
+    }
+
+    function showToast(text) {
+      toastMsg.textContent = text;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 1500);
+    }
+
+    function renderMarkerPins() {
+      markerPinsOverlay.innerHTML = '';
+      if (!state.audioDuration) return;
+
+      state.markers.forEach(m => {
+        const pct = ((m.timeMs / 1000) / state.audioDuration) * 100;
+        if (pct < 0 || pct > 100) return;
+
+        const pin = document.createElement('div');
+        pin.className = 'absolute top-0 bottom-0 pointer-events-none -translate-x-1/2 flex flex-col items-center';
+        pin.style.left = `${pct}%`;
+        pin.innerHTML = `
+          <div class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[9px] sm:text-[10px] leading-tight shadow whitespace-nowrap">
+            ${escapeHtml(m.name)}
+          </div>
+          <div class="w-px h-full bg-amber-400/70"></div>
+        `;
+        markerPinsOverlay.appendChild(pin);
+      });
+    }
+
+    function setPlaybackUI(isPlaying) {
+      if (isPlaying) {
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+        pcPlayIcon.classList.add('hidden');
+        pcPauseIcon.classList.remove('hidden');
+        btnPcPlayText.textContent = '停止';
+        btnMobilePlayText.textContent = '停止';
+      } else {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+        pcPlayIcon.classList.remove('hidden');
+        pcPauseIcon.classList.add('hidden');
+        btnPcPlayText.textContent = '再生';
+        btnMobilePlayText.textContent = '再生';
+      }
+    }
+
+    function seekRelative(seconds) {
+      if (!harmonyAudio.src) return;
+      cancelCountdown();
+      const target = Math.max(0, Math.min(state.audioDuration || 0, harmonyAudio.currentTime + seconds));
+      syncAllMediaTime(target);
+      updateProgress();
+    }
+
+    btnRewind5s.addEventListener('click', () => seekRelative(-5));
+    btnForward5s.addEventListener('click', () => seekRelative(5));
+    btnPcRewind.addEventListener('click', () => seekRelative(-5));
+    btnPcForward.addEventListener('click', () => seekRelative(5));
+
+    harmonyAudio.addEventListener('ended', () => {
+      pauseSynced();
+      setPlaybackUI(false);
+    });
+
+    function updateProgress() {
+      const cur = harmonyAudio.currentTime || 0;
+      if (!state.isCountdown) {
+        currentTimeDisplay.textContent = formatTime(cur);
+      }
+
+      if (state.audioDuration > 0) {
+        const pct = Math.min(100, Math.max(0, (cur / state.audioDuration) * 100));
+        playhead.style.left = `${pct}%`;
+        playedBar.style.width = `${pct}%`;
+      }
+
+      const curMs = cur * 1000;
+      let activeIdx = -1;
+      for (let i = 0; i < state.markers.length; i++) {
+        if (curMs >= state.markers[i].timeMs - 100) {
+          activeIdx = i;
+        } else {
+          break;
+        }
+      }
+
+      if (activeIdx !== state.currentMarkerIndex) {
+        state.currentMarkerIndex = activeIdx;
+        activeMarkerLabel.textContent = activeIdx >= 0 ? state.markers[activeIdx].name : '--';
+        highlightActiveTile(activeIdx);
+      }
+    }
+
+    function handleTimelineSeek(clientX) {
+      if (!state.audioDuration) return;
+      cancelCountdown();
+      const rect = timelineContainer.getBoundingClientRect();
+      const clickX = clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
+      const target = pct * state.audioDuration;
+      syncAllMediaTime(target);
+      updateProgress();
+    }
+
+    timelineContainer.addEventListener('pointerdown', (e) => {
+      isScrubbing = true;
+      handleTimelineSeek(e.clientX);
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (isScrubbing) handleTimelineSeek(e.clientX);
+    });
+    window.addEventListener('pointerup', () => {
+      isScrubbing = false;
+    });
+
+    // ==========================================
+    // CUE ジャンプ & パッド描画
+    // ==========================================
+    function jumpToMarker(index) {
+      if (!harmonyAudio.src || !state.markers[index]) return;
+      const targetSec = state.markers[index].timeMs / 1000;
+      startPlaybackWithPrerollCheck(targetSec);
+    }
+
+    function jumpRelativeCue(delta) {
+      if (state.markers.length === 0) return;
+      let nextIdx = state.currentMarkerIndex + delta;
+      if (nextIdx < 0) nextIdx = 0;
+      if (nextIdx >= state.markers.length) nextIdx = state.markers.length - 1;
+      jumpToMarker(nextIdx);
+    }
+
+    btnPcPrevCue.addEventListener('click', () => jumpRelativeCue(-1));
+    btnPcNextCue.addEventListener('click', () => jumpRelativeCue(1));
+    btnMobilePrevCue.addEventListener('click', () => jumpRelativeCue(-1));
+    btnMobileNextCue.addEventListener('click', () => jumpRelativeCue(1));
+
+    function renderPlayTiles() {
+      playMarkerCount.textContent = `${state.markers.length} 個のキュー`;
+      playTilesGrid.innerHTML = '';
+
+      if (state.markers.length === 0) {
+        playTilesGrid.innerHTML = `<div class="col-span-full py-16 text-center text-slate-500 text-sm rounded-2xl border border-dashed border-slate-800 bg-slate-900/40">マーカーがありません。「編集」タブで追加してください。</div>`;
+        return;
+      }
+
+      state.markers.forEach((m, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `play-tile touch-press py-3 md:py-4 px-2.5 rounded-2xl border border-slate-800 bg-slate-900/90 hover:border-cyan-500/50 text-slate-200 transition flex flex-col items-center justify-center gap-1 shadow-sm ${
+          idx === state.currentMarkerIndex ? 'active-tile' : ''
+        }`;
+        const noteHtml = m.note
+          ? `<span class="tile-sub text-[11px] text-amber-300 font-semibold truncate max-w-full px-1">${escapeHtml(m.note)}</span>`
+          : '';
+        btn.innerHTML = `
+          <span class="text-base sm:text-lg md:text-xl font-black leading-tight text-center break-words">${escapeHtml(m.name)}</span>
+          ${noteHtml}
+          <span class="tile-sub text-[11px] text-slate-400 font-mono-num">${formatTimeMs(m.timeMs)}</span>
+        `;
+        btn.addEventListener('click', () => jumpToMarker(idx));
+        playTilesGrid.appendChild(btn);
+      });
+    }
+
+    function highlightActiveTile(idx) {
+      const tiles = playTilesGrid.querySelectorAll('.play-tile');
+      tiles.forEach((t, i) => {
+        if (i === idx) {
+          t.classList.add('active-tile');
+        } else {
+          t.classList.remove('active-tile');
+        }
+      });
+    }
+
+    // ==========================================
+    // 編集モード
+    // ==========================================
+    function setMode(mode) {
+      state.mode = mode;
+      [playView, editView].forEach(v => v.classList.add('hidden'));
+      [btnModePlay, btnModeEdit].forEach(b => {
+        b.className = 'touch-press px-3 sm:px-4 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-slate-200';
+      });
+
+      if (mode === 'play') {
+        playView.classList.remove('hidden');
+        btnModePlay.className = 'touch-press px-3 sm:px-4 py-1.5 rounded-lg font-bold transition bg-cyan-600 text-white shadow-sm';
+        renderPlayTiles();
+      } else {
+        editView.classList.remove('hidden');
+        btnModeEdit.className = 'touch-press px-3 sm:px-4 py-1.5 rounded-lg font-bold transition bg-cyan-600 text-white shadow-sm';
+        renderMarkersList();
+      }
+    }
+
+    btnModePlay.addEventListener('click', () => setMode('play'));
+    btnModeEdit.addEventListener('click', () => setMode('edit'));
+
+    function addMarkerAtCurrentTime() {
+      const curSec = harmonyAudio.currentTime || 0;
+      const curMs = Math.round(curSec * 1000);
+      const newMarker = {
+        id: Date.now(),
+        name: `Cue ${state.markers.length + 1}`,
+        note: '',
+        timeSec: curSec,
+        timeMs: curMs,
+        color: '#06b6d4'
+      };
+
+      state.markers.push(newMarker);
+      state.markers.sort((a, b) => a.timeMs - b.timeMs);
+      renderMarkerPins();
+      renderPlayTiles();
+      renderMarkersList();
+      saveState();
+      showToast(`「${newMarker.name}」を追加`);
+    }
+
+    btnPcAddMarker.addEventListener('click', addMarkerAtCurrentTime);
+    btnEditAddMarker.addEventListener('click', addMarkerAtCurrentTime);
+
+    function renderMarkersList() {
+      markerCountBadge.textContent = state.markers.length;
+      markersList.innerHTML = '';
+
+      if (state.markers.length === 0) {
+        markersList.innerHTML = `<div class="py-16 text-center text-slate-500 text-sm rounded-2xl border border-dashed border-slate-800 bg-slate-900/40">マーカーがありません。</div>`;
+        return;
+      }
+
+      state.markers.forEach((marker, index) => {
+        const row = document.createElement('div');
+        row.className = 'rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs md:text-sm shadow-sm';
+        row.innerHTML = `
+          <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+            <span class="text-slate-500 font-mono-num text-xs w-5 text-right font-semibold">${index + 1}</span>
+            <input type="text" value="${escapeHtml(marker.name)}" data-id="${marker.id}" placeholder="セクション名"
+              class="marker-name-input w-28 sm:w-32 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 font-bold">
+            <input type="text" value="${escapeHtml(marker.note)}" data-id="${marker.id}" placeholder="メモ(上ハモ等)"
+              class="marker-note-input flex-1 min-w-[80px] bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-amber-300 text-xs">
+            <span class="font-mono-num text-cyan-400 font-bold shrink-0">${formatTimeMs(marker.timeMs)}</span>
+          </div>
+
+          <div class="flex items-center gap-1 shrink-0">
+            <button data-id="${marker.id}" data-step="-100" class="btn-nudge px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-num border border-slate-700 text-xs">-0.1s</button>
+            <button data-id="${marker.id}" data-step="100" class="btn-nudge px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-num border border-slate-700 text-xs">+0.1s</button>
+            <button data-id="${marker.id}" class="btn-play-from px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs">再生</button>
+            <button data-id="${marker.id}" class="btn-delete p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 text-xs" title="削除">✕</button>
+          </div>
+        `;
+        markersList.appendChild(row);
+      });
+
+      attachMarkerEvents();
+    }
+
+    function attachMarkerEvents() {
+      markersList.querySelectorAll('.marker-name-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const id = e.target.getAttribute('data-id');
+          const m = state.markers.find(x => String(x.id) === id);
+          if (m) {
+            m.name = e.target.value.trim() || 'Marker';
+            renderMarkerPins();
+            renderPlayTiles();
+            saveState();
+          }
+        });
+      });
+
+      markersList.querySelectorAll('.marker-note-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const id = e.target.getAttribute('data-id');
+          const m = state.markers.find(x => String(x.id) === id);
+          if (m) {
+            m.note = e.target.value.trim();
+            renderPlayTiles();
+            saveState();
+          }
+        });
+      });
+
+      markersList.querySelectorAll('.btn-nudge').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const step = parseInt(btn.getAttribute('data-step'), 10);
+          const m = state.markers.find(x => String(x.id) === id);
+          if (m) {
+            m.timeMs = Math.max(0, m.timeMs + step);
+            m.timeSec = m.timeMs / 1000;
+            state.markers.sort((a, b) => a.timeMs - b.timeMs);
+            renderMarkersList();
+            renderMarkerPins();
+            renderPlayTiles();
+            saveState();
+            startPlaybackWithPrerollCheck(m.timeSec);
+          }
+        });
+      });
+
+      markersList.querySelectorAll('.btn-play-from').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const idx = state.markers.findIndex(x => String(x.id) === id);
+          if (idx >= 0) jumpToMarker(idx);
+        });
+      });
+
+      markersList.querySelectorAll('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          state.markers = state.markers.filter(x => String(x.id) !== id);
+          renderMarkersList();
+          renderMarkerPins();
+          renderPlayTiles();
+          saveState();
+        });
+      });
+    }
+
+    sortMarkersBtn.addEventListener('click', () => {
+      state.markers.sort((a, b) => a.timeMs - b.timeMs);
+      renderMarkersList();
+      renderMarkerPins();
+      renderPlayTiles();
+      saveState();
+      showToast('時間順に整列しました');
+    });
+
+    resetDefaultMarkersBtn.addEventListener('click', () => {
+      if (!confirm('マーカーを初期状態（ひとたらし 14箇所）に戻しますか？')) return;
+      state.markers = cloneDefaultMarkers();
+      renderMarkersList();
+      renderMarkerPins();
+      renderPlayTiles();
+      saveState();
+      showToast('初期マーカーに戻しました');
+    });
+
+    // ==========================================
+    // JSON インポート & エクスポート
+    // ==========================================
+    downloadJsonBtn.addEventListener('click', () => {
+      const data = {
+        title: 'ひとたらし ハモリ練習',
+        duration: state.audioDuration,
+        videoOffsetSec: state.videoOffsetSec,
+        midiOffsetSec: state.midiOffsetSec,
+        markers: state.markers.map((m, i) => ({
+          id: m.id ?? i + 1,
+          name: m.name,
+          note: m.note || '',
+          timeSec: m.timeSec,
+          timeMs: m.timeMs,
+          isRegion: false,
+          lengthSec: 0,
+          lengthMs: 0,
+          color: m.color || '#06b6d4'
+        })),
+        prerollEnabled: state.prerollEnabled,
+        prerollSec: state.prerollSec,
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ひとたらし_markers.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('JSONをエクスポートしました');
+    });
+
+    jsonFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (Array.isArray(data.markers)) {
+            state.markers = data.markers.map((m, idx) => normalizeMarker(m, idx));
+            state.markers.sort((a, b) => a.timeMs - b.timeMs);
+          }
+          if (typeof data.prerollEnabled === 'boolean') state.prerollEnabled = data.prerollEnabled;
+          if (typeof data.prerollSec === 'number') state.prerollSec = data.prerollSec;
+          if (typeof data.videoOffsetSec === 'number') state.videoOffsetSec = data.videoOffsetSec;
+          if (typeof data.midiOffsetSec === 'number') state.midiOffsetSec = data.midiOffsetSec;
+
+          updateOptionsUI();
+          updateOffsetUI();
+          renderMarkersList();
+          renderMarkerPins();
+          renderPlayTiles();
+          drawPitchBar();
+          saveState();
+          showToast('JSONをインポートしました');
+        } catch (err) {
+          showToast('JSON読み込み失敗');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    // ==========================================
+    // キーボードショートカット
+    // ==========================================
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        addMarkerAtCurrentTime();
+      } else if (e.code === 'KeyP') {
+        e.preventDefault();
+        btnPrerollToggle.click();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seekRelative(-5);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seekRelative(5);
+      } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        jumpRelativeCue(-1);
+      } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        jumpRelativeCue(1);
+      }
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // 起動時初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedState();
+      updateMixerUI();
+      updateOffsetUI();
+      updateOptionsUI();
+      updatePitchBarVisibility();
+      renderPlayTiles();
+      renderMarkersList();
+      renderMarkerPins();
+      initMedia();
+      drawPitchBar();
+    });
+  </script>
+</body>
+</html>
